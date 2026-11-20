@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Workout Pot">
+<meta name="theme-color" content="#2457d6">
+<title>Workout Pot</title>
+<style>
+:root{--bg:#eef2f6;--fg:#141a22;--card:#fff;--mut:#5f6b7a;--acc:#2457d6;--fee:#b45309;--bd:#dde3ea;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1620;--fg:#e8edf3;--card:#18212c;--mut:#93a0b0;--acc:#6b9bff;--fee:#fbbf24;--bd:#27323f;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:600px;margin:0 auto;padding:16px}
+h1{font-size:24px;margin:4px 0 12px}h2{font-size:17px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:14px}
+.big{font-size:44px;font-weight:800;line-height:1}.mut{color:var(--mut);font-size:14px}
+.bar{height:10px;background:var(--bd);border-radius:6px;overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;background:var(--acc)}
+.row{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:9px 0;border-top:1px solid var(--bd)}.row:first-child{border-top:0}
+.grid{display:grid;grid-template-columns:1fr 90px;gap:8px}
+select,input,textarea,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:11px;width:100%;margin-top:6px}
+button{background:var(--acc);color:#fff;border:0;font-weight:600}button.s{width:auto;margin:0;padding:5px 11px;background:var(--bd);color:var(--fg);font-weight:500}button.l{background:none;color:var(--acc);border:0}
+textarea{min-height:110px;font-family:ui-monospace,monospace;font-size:13px}
+.pill{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--bd);white-space:nowrap}.fee{color:var(--fee);font-weight:700}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+</style></head><body><main>
+<h1>Workout Pot</h1>
+<div id="msg" class="card mut">Loading…</div>
+
+<div id="auth" class="card" hidden><h2 id="at">Sign in</h2>
+<input id="em" type="email" placeholder="Email" autocomplete="email"><input id="pw" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
+<button id="go">Sign in</button><button class="l" id="tg">New here? Create an account</button><div class="mut" id="ae"></div></div>
+
+<div id="join" hidden>
+<div class="card"><h2>Join a group</h2><input id="jn" placeholder="Your name"><input id="jc" placeholder="Invite code"><button id="jb">Join group</button></div>
+<div class="card"><h2>Or start a new group</h2><input id="cn" placeholder="Your name"><input id="cg" placeholder="Group name"><button id="cb">Create group</button></div>
+<button class="l" id="so1">Sign out</button><div class="mut" id="je"></div></div>
+
+<div id="app" hidden>
+<div class="card" id="me"></div>
+<div class="card"><h2>Log a workout</h2>
+<div class="grid"><select id="act"></select><input id="qty" type="number" step="any" value="1" aria-label="Quantity"></div>
+<input id="dt" type="date" aria-label="Date"><button id="add">Add</button></div>
+<div class="card"><h2>This week’s leaderboard</h2><div id="lb"></div></div>
+<div class="card"><h2>The pot</h2><div id="pot"></div></div>
+<div class="card">
