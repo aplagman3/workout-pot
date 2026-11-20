@@ -42,4 +42,98 @@ textarea{min-height:110px;font-family:ui-monospace,monospace;font-size:13px}
 <input id="dt" type="date" aria-label="Date"><button id="add">Add</button></div>
 <div class="card"><h2>This week’s leaderboard</h2><div id="lb"></div></div>
 <div class="card"><h2>The pot</h2><div id="pot"></div></div>
-<div class="card">
+<div class="card"><h2>My recent entries</h2><div id="mine"></div></div>
+<div class="card"><h2>Group</h2><div class="mut" id="gi"></div>
+<div id="admin" hidden>
+<label class="mut" for="goal">Weekly goal (points)</label><input id="goal" type="number">
+<label class="mut" for="tiers">Penalty tiers, one per line as “percent of goal, fee”. The highest matching percent wins.</label><textarea id="tiers"></textarea>
+<label class="mut" for="acts">Activities, one per line as “name, points per unit”</label><textarea id="acts"></textarea>
+<button id="save">Save settings</button></div>
+<button class="l" id="so2">Sign out</button></div>
+</div></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+// Paste your two values from Supabase > Project Settings > API
+const SUPABASE_URL='https://nyinuzqvreudqgmxtyhs.supabase.co';
+const SUPABASE_KEY='sb_publishable_3GaVuTq3Mz6K_nyw_vdcmw_8bWhCcl9';
+
+const DEF_ACTS=[['Push ups (10)',1],['Pull ups (10)',3],['1 mile run',10],['Squats (10)',1],['1 min plank',2],['Core (50)',2],['Burpees (10)',1],['Single leg exercise (10)',1],['Bike (1 mile)',2],['Meditation (10 min)',5],['Stretch (5 min)',2],['Fast (16 hours)',10],['Protein',10],['Beer',-10],['Sweets',-5]];
+const $=id=>document.getElementById(id);
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const P=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const addD=(s,n)=>{const d=P(s);d.setDate(d.getDate()+n);return ymd(d)};
+const mon=s=>{const d=P(s);d.setDate(d.getDate()-((d.getDay()+6)%7));return ymd(d)};
+const today=()=>ymd(new Date());
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const view=v=>{['auth','join','app'].forEach(x=>$(x).hidden=x!==v);$('msg').hidden=true};
+let sb,U,G,MB=[],EN=[],isNew=false,actKey='';
+
+const fee=(p,g)=>{const t=[...g.tiers].sort((a,b)=>b.pct-a.pct),pc=p/g.goal*100;for(const x of t)if(pc>=x.pct)return x.fee;return t.length?t[t.length-1].fee:0};
+function stats(m){
+ const es=EN.filter(e=>e.user_id===m.user_id),W={},D={};
+ es.forEach(e=>{const p=e.n*e.pts,w=mon(e.day);W[w]=(W[w]||0)+p;D[e.day]=(D[e.day]||0)+p});
+ const cur=mon(today()),first=mon(m.joined>G.start?m.joined:G.start);
+ let owed=0;for(let w=first;w<cur;w=addD(w,7))owed+=fee(W[w]||0,G);
+ let ws=(W[cur]||0)>=G.goal?1:0;for(let w=addD(cur,-7);w>=first&&(W[w]||0)>=G.goal;w=addD(w,-7))ws++;
+ let ds=0,d=today();if(!(D[d]>0))d=addD(d,-1);while(D[d]>0){ds++;d=addD(d,-1)}
+ return{cur:Math.round((W[cur]||0)*10)/10,owed,ws,ds};
+}
+function render(){
+ const k=JSON.stringify(G.acts);
+ if(k!==actKey){actKey=k;const v=$('act').value;$('act').innerHTML=G.acts.map((a,i)=>`<option value="${i}">${esc(a[0])} (${a[1]>0?'+':''}${a[1]})</option>`).join('');if(v)$('act').value=v}
+ const me=MB.find(m=>m.user_id===U.id),s=stats(me),pc=Math.max(0,Math.min(100,s.cur/G.goal*100));
+ $('me').innerHTML=`<div class="mut">Week of ${mon(today())}, goal ${G.goal}</div><div class="big">${s.cur}<span class="mut" style="font-size:16px;font-weight:400"> points</span></div><div class="bar"><i style="width:${pc}%"></i></div>
+ <div class="mut">${s.cur>=G.goal?'Goal hit. Nothing owed this week.':`${Math.round((G.goal-s.cur)*10)/10} to go. If the week ended now: <span class="fee">$${fee(s.cur,G)}</span> into the pot.`}</div>
+ <div style="margin-top:10px"><span class="pill">${s.ws}-week goal streak</span> <span class="pill">${s.ds}-day streak</span></div>`;
+ const rows=MB.map(m=>({m,s:stats(m)})).sort((a,b)=>b.s.cur-a.s.cur);
+ $('lb').innerHTML=rows.map((r,i)=>`<div class="row"><span>${i+1}. ${esc(r.m.name)} <span class="pill">${r.s.ws}w</span> <span class="pill">${r.s.ds}d</span></span><b>${r.s.cur}</b></div>`).join('');
+ const tot=rows.reduce((a,r)=>a+r.s.owed,0);
+ $('pot').innerHTML=`<div class="big fee">$${tot}</div><div class="mut">From completed weeks. Honor system.</div>`+rows.filter(r=>r.s.owed).map(r=>`<div class="row"><span>${esc(r.m.name)}</span><b>$${r.s.owed}</b></div>`).join('')+
+ `<div class="mut" style="margin-top:8px">Tiers: ${[...G.tiers].sort((a,b)=>b.pct-a.pct).map(t=>`${t.pct}%+ is $${t.fee}`).join(', ')}</div>`;
+ $('mine').innerHTML=EN.filter(e=>e.user_id===U.id).sort((a,b)=>b.day.localeCompare(a.day)).slice(0,15).map(e=>`<div class="row"><span>${esc(e.act)} ×${e.n}<div class="mut">${e.day}, ${Math.round(e.n*e.pts*10)/10} points</div></span><span><button class="s" data-e="${e.id}">Edit</button> <button class="s" data-x="${e.id}">Delete</button></span></div>`).join('')||'<div class="mut">Nothing logged yet.</div>';
+ $('gi').innerHTML=`${esc(G.name)}. Invite code: <b>${esc(G.code)}</b>`;
+ const adm=G.admin===U.id;$('admin').hidden=!adm;
+ if(adm&&!document.activeElement.matches('input,textarea')){$('goal').value=G.goal;$('tiers').value=G.tiers.map(x=>x.pct+', '+x.fee).join('\n');$('acts').value=G.acts.map(a=>a[0]+', '+a[1]).join('\n')}
+}
+async function load(){
+ const{data:m}=await sb.from('members').select('group_id').eq('user_id',U.id).limit(1);
+ if(!m||!m.length){view('join');return}
+ const gid=m[0].group_id;
+ const[g,mb,en]=await Promise.all([sb.from('groups').select('*').eq('id',gid).single(),sb.from('members').select('*').eq('group_id',gid),sb.from('entries').select('*').eq('group_id',gid)]);
+ if(g.error){view('join');return}
+ G=g.data;MB=mb.data||[];EN=en.data||[];view('app');render();
+}
+async function boot(){
+ if(SUPABASE_URL.startsWith('PASTE')){$('msg').textContent='Setup needed: paste your Supabase URL and key at the top of this file.';return}
+ sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);$('dt').value=today();
+ const{data:{session}}=await sb.auth.getSession();U=session&&session.user;
+ if(U)await load();else view('auth');
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&U&&G)load()});
+}
+$('tg').onclick=()=>{isNew=!isNew;$('at').textContent=isNew?'Create account':'Sign in';$('go').textContent=isNew?'Create account':'Sign in';$('tg').textContent=isNew?'Have an account? Sign in':'New here? Create an account'};
+$('go').onclick=async()=>{
+ $('ae').textContent='';const c={email:$('em').value.trim(),password:$('pw').value};
+ const r=isNew?await sb.auth.signUp(c):await sb.auth.signInWithPassword(c);
+ if(r.error){$('ae').textContent=r.error.message;return}
+ U=r.data.user;if(!r.data.session){$('ae').textContent='Check your email to confirm, then sign in.';return}
+ await load();
+};
+const out=async()=>{await sb.auth.signOut();U=null;G=null;view('auth')};$('so1').onclick=out;$('so2').onclick=out;
+$('jb').onclick=async()=>{const r=await sb.rpc('join_group',{c:$('jc').value,nm:$('jn').value.trim()});if(r.error){$('je').textContent=r.error.message;return}await load()};
+$('cb').onclick=async()=>{if(!$('cn').value.trim()||!$('cg').value.trim()){$('je').textContent='Enter your name and a group name.';return}
+ const r=await sb.rpc('create_group',{gname:$('cg').value.trim(),nm:$('cn').value.trim(),a:DEF_ACTS});if(r.error){$('je').textContent=r.error.message;return}await load()};
+$('add').onclick=async()=>{const a=G.acts[+$('act').value],n=parseFloat($('qty').value);if(!a||!n||!$('dt').value)return;
+ const r=await sb.from('entries').insert({group_id:G.id,act:a[0],n,pts:a[1],day:$('dt').value});if(r.error)alert(r.error.message);await load()};
+$('mine').onclick=async e=>{const x=e.target.dataset.x,ed=e.target.dataset.e;if(!x&&!ed)return;
+ if(x){if(!confirm('Delete this entry?'))return;await sb.from('entries').delete().eq('id',x)}
+ else{const en=EN.find(i=>i.id===ed),v=parseFloat(prompt('New quantity',en.n));if(!v)return;await sb.from('entries').update({n:v}).eq('id',ed)}
+ await load()};
+$('save').onclick=async()=>{
+ const goal=parseInt($('goal').value);
+ const tiers=$('tiers').value.split('\n').map(l=>l.split(',').map(Number)).filter(a=>a.length>=2&&!a.some(isNaN)).map(a=>({pct:a[0],fee:a[1]}));
+ const acts=$('acts').value.split('\n').map(l=>{const i=l.lastIndexOf(',');return[l.slice(0,i).trim(),parseFloat(l.slice(i+1))]}).filter(a=>a[0]&&!isNaN(a[1]));
+ if(!goal||!tiers.length||!acts.length){alert('Check your goal, tiers, and activities.');return}
+ const r=await sb.from('groups').update({goal,tiers,acts}).eq('id',G.id);if(r.error){alert(r.error.message);return}alert('Saved.');await load()};
+boot();
+</script></body></html>
